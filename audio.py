@@ -1,12 +1,15 @@
 # %%
 import io
 import ebooklib
+import re
 from ebooklib import epub
 from bs4 import BeautifulSoup
 from gtts import gTTS
 from google.cloud import texttospeech
-import re
 from pydub import AudioSegment
+from tqdm import tqdm
+
+MAX_CHAR_CLOUD = 5000
 
 # %%
 blacklist = [
@@ -28,25 +31,24 @@ def read(chap):
     for t in text:
         if t.parent.name not in blacklist:
             if t.parent.name == "li":
+                # pause between items in list
                 output += "{}, ".format(t.strip())
             else:
                 output += "{} ".format(t.strip())
     return output
 
 
-def get_text():
-    # %%
-    book = epub.read_epub("book.epub")
-
+def get_text(file):
+    book = epub.read_epub(file)
     links = []
+    chapters = []
+
     for item in book.get_items_of_type(ebooklib.ITEM_DOCUMENT):
         links.append((item.get_name(), item.get_content()))
 
-    # %%
-    chapters = []
-
     for l in book.toc:
         if type(l) == tuple:
+            # subsections
             print(f"{len(chapters)}: {l[0].title}")
             chapters.append(l[0].href)
 
@@ -69,9 +71,6 @@ def get_text():
             if i == len(chapters):
                 break
 
-    # %%
-    sel = int(input("Input chapter: "))
-
     chapter = []
     if sel == len(chapters) - 1:
         chapter = links[ch_links[sel] :]
@@ -85,14 +84,14 @@ def get_text():
     text = text.replace("\n", " ")
     text = " ".join(text.split())
 
-    return text
+    return text, sel
 
     # %%
     # obj = gTTS(text=text[:2000], lang="en", slow=False)
     # obj.save("chapter" + str(x) + ".mp3")
 
 
-def get_mp3(text, output):
+def get_mp3(text):
     # Instantiates a client
     client = texttospeech.TextToSpeechClient()
 
@@ -120,14 +119,24 @@ def get_mp3(text, output):
 
 
 def main():
-    # text = get_text()
-    # sentences = re.split(r"(?<=\.) ", text)
+    text, sel = get_text("book.epub")
+    print(f"Char length: {len(text)}")
+    sentences = re.split(r"(?<=\.) ", text)
 
     output = AudioSegment.empty()
-    output += AudioSegment.from_mp3(io.BytesIO(get_mp3("hello.", "test.mp3")))
-    output += AudioSegment.from_mp3(io.BytesIO(get_mp3("world.", "test.mp3")))
+    current = ""
 
-    output.export("test.mp3", format="mp3")
+    for s in tqdm(sentences):
+        if len(current) + len(s) > MAX_CHAR_CLOUD:
+            output += AudioSegment.from_mp3(io.BytesIO(get_mp3(current)))
+            current = ""
+
+        current += s
+
+    if current:
+        output += AudioSegment.from_mp3(io.BytesIO(get_mp3(current)))
+
+    output.export(f"ch{sel}.mp3", format="mp3")
 
 
 # %%

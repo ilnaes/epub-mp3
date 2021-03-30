@@ -9,7 +9,7 @@ from google.cloud import texttospeech
 from pydub import AudioSegment
 from tqdm import tqdm
 
-MAX_CHAR_CLOUD = 5000
+MAX_CHAR = 5000
 
 # %%
 blacklist = [
@@ -48,7 +48,6 @@ def get_text(file):
 
     for l in book.toc:
         if type(l) == tuple:
-            # subsections
             print(f"{len(chapters)}: {l[0].title}")
             chapters.append(l[0].href)
 
@@ -70,6 +69,8 @@ def get_text(file):
 
             if i == len(chapters):
                 break
+
+    sel = int(input("Input chapter: "))
 
     chapter = []
     if sel == len(chapters) - 1:
@@ -127,7 +128,7 @@ def main():
     current = ""
 
     for s in tqdm(sentences):
-        if len(current) + len(s) > MAX_CHAR_CLOUD:
+        if len(current) + len(s) > MAX_CHAR:
             output += AudioSegment.from_mp3(io.BytesIO(get_mp3(current)))
             current = ""
 

@@ -1,13 +1,13 @@
-import io
-import ebooklib
-import re
-from ebooklib import epub
-from bs4 import BeautifulSoup
 import argparse
+import io
+import re
 
+import ebooklib
+from bs4 import BeautifulSoup
+from ebooklib import epub
+from google.cloud import texttospeech
 # from gtts import gTTS
 from google.oauth2 import service_account
-from google.cloud import texttospeech
 from pydub import AudioSegment
 from tqdm import tqdm
 
@@ -35,20 +35,23 @@ def read(chap):
         if item.parent.name not in blacklist:
             if item.parent.name == "li":
                 # pause between items in list
-                output += "{}, ".format(item.strip())
+                output += f"{item.strip()}, "
+            elif item.parent.name[0] == "h":
+                # pull stop after titles
+                output += f"{item.strip()}. "
             else:
-                output += "{} ".format(item.strip())
+                output += f"{item.strip()} "
     return output
 
 
 def get_text(file):
     book = epub.read_epub(file)
 
-    links = []
     chapters = []
-
-    for item in book.get_items_of_type(ebooklib.ITEM_DOCUMENT):
-        links.append((item.get_name(), item.get_content()))
+    links = [
+        (x.get_name(), x.get_content())
+        for x in book.get_items_of_type(ebooklib.ITEM_DOCUMENT)
+    ]
 
     for ch in book.toc:
         if type(ch) == tuple:
@@ -130,20 +133,29 @@ def parse_args():
         type=str,
         help="path to google credentials json (if not using environment variable)",
     )
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=str,
+        help="name of the mp3 output (default will be ch##.mp3 where ## is your selection)",
+    )
 
     parser.add_argument("file", type=str, help="path to epub")
     args = parser.parse_args()
 
-    return args.key, args.file
+    return args.key, args.file, args.output
 
 
 def main():
-    creds, file = parse_args()
+    creds, file, outfile = parse_args()
 
     if creds is not None:
         creds = service_account.Credentials.from_service_account_file(creds)
 
     text, sel = get_text(file)
+
+    if outfile is None:
+        outfile = f"ch{sel}.mp3"
 
     print(f"Char length: {len(text)}")
     sentences = re.split(r"(?<=\.) ", text)
@@ -161,7 +173,7 @@ def main():
     if current:
         output += AudioSegment.from_mp3(io.BytesIO(get_mp3(current, creds)))
 
-    output.export(f"ch{sel}.mp3", format="mp3")
+    output.export(outfile, format="mp3")
     # obj = gTTS(text=text[:2000], lang="en", slow=False)
     # obj.save("chapter" + str(x) + ".mp3")
 

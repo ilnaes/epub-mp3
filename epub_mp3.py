@@ -73,22 +73,38 @@ def get_text(file):
     #%%
     j = 0
     pos = []  # converts toc to pointers to locations in contents
+    prev = ""
 
     def print_ch(items, n):
         nonlocal j
+        nonlocal prev
+
         for x in items:
             if type(x) == tuple or type(x) == list:
                 print_ch(x, n + 1)
             else:
+                curr = x.href
+                i = curr.find("#")
+                if i >= 0:
+                    # filter out jump link
+                    curr = curr[0:i]
+                if curr == prev:
+                    continue
+
                 print(f"\033[92m{j}:\033[0m " + ("  " * n) + x.title)
-                pos.append(idx[x.href])
+                pos.append(idx[curr])
                 j += 1
+                prev = curr
 
     print_ch(book.toc, 0)
 
     #%%
     start = get_input(f"Input start chapter 0-{j-1}: ", (0, j - 1))
-    end = get_input(f"Input end chapter {start}-{j-1}: ", (start, j - 1), [""])
+    end = get_input(
+        f"Input end chapter {start}-{j-1}: (Can press ENTER to select just the one start chapter) ",
+        (start, j - 1),
+        [""],
+    )
 
     if end == "":
         end = start

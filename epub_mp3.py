@@ -11,7 +11,7 @@ from pydub import AudioSegment
 from tqdm import tqdm
 
 # max chunks to send each time
-MAX_CHAR = 5000
+MAX_CHAR = 4500
 
 blacklist = [
     "[document]",
@@ -113,7 +113,7 @@ def get_text(file):
 
     chapters = []
 
-    for i in range(pos[start], pos[end] + 1):
+    for i in range(pos[start], pos[end + 1]):
         text = read(contents[i])
         text = text.replace("\n", " ")
         text = " ".join(text.split())
@@ -186,7 +186,10 @@ def main():
     text, sel = get_text(args.file)
 
     if args.output is None:
-        outfile = f"ch{sel}.mp3"
+        outfile = input(f"Output file (default ch{sel}.mp3): ") or f"ch{sel}.mp3"
+
+        if outfile[-4:] != ".mp3":
+            outfile += ".mp3"
 
     print(f"Char length: {len(text)}")
     sentences = re.split(r"(?<=\.) ", text)
